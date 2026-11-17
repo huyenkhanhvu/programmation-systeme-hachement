@@ -1,93 +1,169 @@
-# P-Sys-M1-2026
+# HACHEMENT — Table de hachage persistante en C
 
+Projet universitaire de programmation système : conception et implémentation d'une table de hachage stockée dans un fichier, permettant de gérer des chaînes de caractères et des fichiers, avec prise en compte des accès concurrents.
 
+## Présentation
 
-## Getting started
+HACHEMENT est un programme en ligne de commande écrit en C. Les données sont conservées dans un fichier binaire de table de hachage et restent disponibles entre deux exécutions.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+Le projet met en pratique la programmation système sous environnement POSIX : gestion des fichiers, mappage mémoire `mmap`, verrous `fcntl`, synchronisation avec des mutex POSIX `pthread` et manipulation de structures de données.
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+## Fonctionnalités
 
-## Add your files
+- Création d'une table de hachage persistante.
+- Insertion de chaînes de caractères et de fichiers.
+- Insertion de lignes provenant d'un fichier texte.
+- Recherche d'une chaîne ou d'un nom de fichier.
+- Suppression d'une chaîne ou des objets associés à un hashcode.
+- Consultation de l'occupation de la table.
+- Vérification de la cohérence de la table et détection de certaines corruptions.
+- Agrandissement, réduction et ajustement de la taille de la table.
+- Synchronisation des accès aux blocs avec des verrous de fichiers et des mutex.
 
-* [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Fonctionnement technique
+
+### Organisation des données
+
+La table repose sur des blocs de 1024 octets. Chaque entrée contient notamment des informations de chaînage, la longueur et le type de l'objet, ainsi qu'une zone de données de 1008 octets. Les objets volumineux peuvent s'étendre sur plusieurs blocs. Les collisions sont gérées au moyen de chaînes de blocs.
+
+### Fonctions de hachage
+
+La fonction de hachage dépend de l'extension de la table :
+
+- `.cks` : somme de contrôle sur 32 bits (checksum32).
+- `.sha` : calcul basé sur SHA-1 via OpenSSL.
+
+SHA-1 est utilisé ici comme fonction de hachage dans le cadre d'un projet pédagogique, pas comme mécanisme de sécurité cryptographique moderne.
+
+### Accès concurrents
+
+Le programme utilise des verrous POSIX (`fcntl`) sur les blocs et des mutex (`pthread`) pour coordonner certaines opérations. Un paramètre `slowns` permet d'introduire un délai en nanosecondes lors du déverrouillage, notamment pour étudier le comportement concurrent.
+
+## Prérequis
+
+- Un environnement compatible POSIX (Linux recommandé).
+- Un compilateur C, par exemple `gcc`.
+- `make`.
+- La bibliothèque de développement OpenSSL/libcrypto.
+- Le support de pthread.
+
+Sur une distribution Debian/Ubuntu, les outils nécessaires peuvent être installés avec :
 
 ```
-cd existing_repo
-git remote add origin https://moule.informatique.univ-paris-diderot.fr/kvu/p-sys-m1-2026.git
-git branch -M main
-git push -uf origin main
+sudo apt update
+sudo apt install build-essential libssl-dev
 ```
 
-## Integrate with your tools
+## Installation et compilation
 
-* [Set up project integrations](https://moule.informatique.univ-paris-diderot.fr/kvu/p-sys-m1-2026/-/settings/integrations)
+```
+git clone https://github.com/huyenkhanhvu/programmation-systeme-hachement.git
+cd programmation-systeme-hachement
+make
+```
 
-## Collaborate with your team
+La compilation produit un exécutable nommé `hachement`. Le `Makefile` utilise `gcc` avec `-Wall -Wextra -O2`, et lie le programme avec `-lcrypto -pthread`.
 
-* [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+Pour supprimer l'exécutable et les fichiers de table générés dans le dossier courant :
 
-## Test and Deploy
+```
+make clean
+```
 
-Use the built-in continuous integration in GitLab.
+**Attention :** `make clean` supprime également les fichiers `*.cks` et `*.sha` du répertoire courant. Sauvegardez vos tables avant de l'exécuter.
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+## Utilisation
 
-***
+Syntaxe générale :
 
-# Editing this README
+```
+./hachement <commande> <table> <slowns> [arguments]
+```
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+- `<table>` : nom du fichier de table, avec extension `.cks` ou `.sha`.
+- `<slowns>` : délai en nanosecondes (mettre `0` pour ne pas ajouter de délai).
+- `[arguments]` : paramètres propres à chaque commande.
 
-## Suggestions for a good README
+### Exemple de prise en main
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+Créer une table de 128 blocs :
 
-## Name
-Choose a self-explaining name for your project.
+```
+./hachement make exemple.cks 0 128
+```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+Insérer deux chaînes :
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+```
+./hachement insertstring exemple.cks 0 "bonjour"
+./hachement insertstring exemple.cks 0 "programmation systeme"
+```
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+Rechercher une chaîne :
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```
+./hachement lookup exemple.cks 0 "bonjour"
+```
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+Afficher les informations d'occupation et vérifier la table :
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```
+./hachement free exemple.cks 0
+./hachement check exemple.cks 0
+```
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+Supprimer une chaîne :
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+```
+./hachement delete exemple.cks 0 "bonjour"
+```
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+### Commandes disponibles
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+| Commande | Description | Argument supplémentaire |
+| --- | --- | --- |
+| `make` | Créer une table vide | Nombre de blocs |
+| `free` | Afficher l'occupation de la table | Aucun |
+| `insertstring` | Insérer une chaîne | Chaîne |
+| `insertfile` | Insérer un fichier | Chemin du fichier |
+| `insertlines` | Insérer des lignes d'un fichier texte | Chemin du fichier |
+| `lookup` | Rechercher une chaîne ou un nom de fichier | Chaîne ou nom |
+| `delete` | Supprimer une chaîne exacte | Chaîne |
+| `deletehash` | Supprimer les objets d'un hashcode | Hashcode (décimal ou hexadécimal) |
+| `check` | Vérifier la cohérence de la table | Aucun |
+| `extend` | Doubler le nombre de blocs | Aucun |
+| `shrink` | Réduire le nombre de blocs de moitié | Aucun |
+| `ajust` | Ajuster la taille selon le taux d'occupation | Aucun |
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+Exemple pour insérer un fichier :
 
-## License
-For open source projects, say how it is licensed.
+```
+./hachement insertfile exemple.cks 0 document.txt
+```
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Exemple de redimensionnement :
+
+```
+./hachement extend exemple.cks 0
+./hachement ajust exemple.cks 0
+```
+
+La commande `ajust` agrandit la table au-dessus de 70 % d'occupation et cherche à la réduire sous 10 %, si les contraintes de taille le permettent.
+
+## Structure du dépôt
+
+```text
+programmation-systeme-hachement/
+├── hachement.c         # Implémentation et interface en ligne de commande
+├── Makefile            # Règles de compilation et de nettoyage
+├── rapport-progsys.pdf # Rapport du projet
+└── README.md           # Documentation du projet
+```
+
+## Compétences mobilisées
+
+C, Programmation système, Linux/POSIX, Structures de données, Tables de hachage, Gestion mémoire, Fichiers binaires, mmap, fcntl, pthread, Synchronisation, Makefile, OpenSSL
+
+## Documentation
+
+Le [rapport du projet](rapport-progsys.pdf) fournit des informations complémentaires sur sa conception et sa réalisation.
